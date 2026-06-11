@@ -9,6 +9,7 @@ A collection of [Agent Skills](https://agentskills.io) for Claude Code and other
 | Skill | Description |
 |---|---|
 | [`rn-layered-feature`](rn-layered-feature/SKILL.md) | Standard architecture for adding a React Native feature module — pure-logic / hook / view three-layer separation + dependency injection, with mandatory test-first TDD. |
+| [`react-layered-feature`](react-layered-feature/SKILL.md) | The pure-web React sibling of `rn-layered-feature` — same pure-reducer state machine, hook, and DI layering over browser APIs (`MediaRecorder`, Permissions API), with mandatory test-first TDD. |
 
 ## Install
 
@@ -17,9 +18,11 @@ Install with the [`skills`](https://github.com/vercel-labs/skills) CLI (no globa
 ```bash
 # Install a specific skill into the current project
 npx skills add https://github.com/myfaverate/skills --skill rn-layered-feature
+npx skills add https://github.com/myfaverate/skills --skill react-layered-feature
 
 # Install globally (available across all projects), for Claude Code, no prompts
 npx skills add https://github.com/myfaverate/skills --skill rn-layered-feature -g -a claude-code -y
+npx skills add https://github.com/myfaverate/skills --skill react-layered-feature -g -a claude-code -y
 
 # List all skills in this repo without installing
 npx skills add https://github.com/myfaverate/skills --list
@@ -29,6 +32,7 @@ Use a skill once without installing it:
 
 ```bash
 npx skills use https://github.com/myfaverate/skills --skill rn-layered-feature --agent claude-code
+npx skills use https://github.com/myfaverate/skills --skill react-layered-feature --agent claude-code
 ```
 
 After installing, the skill lands in your agent's skills directory (e.g. `.claude/skills/` for project scope, `~/.claude/skills/` for global) and the agent loads it automatically when relevant.
