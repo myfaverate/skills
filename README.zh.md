@@ -17,22 +17,22 @@
 
 ```bash
 # 安装指定 skill 到当前项目
-npx skills add https://github.com/myfaverate/skills --skill rn-layered-feature
-npx skills add https://github.com/myfaverate/skills --skill react-layered-feature
+npx skills add myfaverate/skills --skill rn-layered-feature
+npx skills add myfaverate/skills --skill react-layered-feature
 
 # 安装到全局（所有项目可用），仅装给 Claude Code，免确认
-npx skills add https://github.com/myfaverate/skills --skill rn-layered-feature -g -a claude-code -y
-npx skills add https://github.com/myfaverate/skills --skill react-layered-feature -g -a claude-code -y
+npx skills add myfaverate/skills --skill rn-layered-feature -g -a claude-code -y
+npx skills add myfaverate/skills --skill react-layered-feature -g -a claude-code -y
 
 # 仅列出本仓库的所有 skill，不安装
-npx skills add https://github.com/myfaverate/skills --list
+npx skills add myfaverate/skills --list
 ```
 
 不安装、临时使用一次：
 
 ```bash
-npx skills use https://github.com/myfaverate/skills --skill rn-layered-feature --agent claude-code
-npx skills use https://github.com/myfaverate/skills --skill react-layered-feature --agent claude-code
+npx skills use myfaverate/skills --skill rn-layered-feature --agent claude-code
+npx skills use myfaverate/skills --skill react-layered-feature --agent claude-code
 ```
 
 安装后，skill 会落到对应 agent 的 skills 目录（项目级如 `.claude/skills/`，全局如 `~/.claude/skills/`），agent 会在相关场景自动加载。
