@@ -1,0 +1,74 @@
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC
+    "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+    "https://checkstyle.org/dtds/configuration_1_3.dtd">
+
+<!--
+  java-safe house-style checks — the MACHINE-CHECKABLE subset only.
+
+  This config deliberately covers ONLY conventions 3 and 4, the two that a
+  static checker can verify deterministically:
+
+    Convention 4 (no var)            -> RegexpSinglelineJava
+    Convention 3 (final locals)      -> FinalLocalVariable
+    Convention 3 (final parameters)  -> FinalParameters
+
+  It deliberately OMITS:
+    Convention 1 (nullability)  — needs NullAway wired into the target build;
+                                  cannot run on loose .java files.
+    Convention 2 (visibility)   — needs cross-file caller analysis to tell a
+                                  legitimate public API from an over-broad one.
+                                  Checkstyle's VisibilityModifier checks only
+                                  FIELDS and defaults to "fields must be private",
+                                  which CONTRADICTS our "package-private by
+                                  default" rule, so it is intentionally not used.
+    Convention 3 (final FIELDS) — not reliably checkable; left to manual review.
+
+  The HTML report surfaces conventions 1 and 2 as "needs review", never as
+  pass/fail, so a clean run is never mistaken for full house-style compliance.
+-->
+<module name="Checker">
+  <property name="charset" value="UTF-8"/>
+  <property name="severity" value="warning"/>
+
+  <module name="TreeWalker">
+    <!-- Convention 4: no `var`.
+         The guard (^|[^.\w]) keeps this from matching identifiers that merely
+         contain "var" (someVar, variance) or member access (.var). A real
+         declaration `var x = ...` matches; an explicit-var lambda param
+         `(var x) ->` also matches (correctly — convention 4 bans that form),
+         while an implicit lambda param `x ->` has no `var` token and is left
+         alone. ignoreComments skips // and /* */; a `var` inside a STRING
+         literal is the one documented residual false-positive.
+         RegexpSinglelineJava must live inside TreeWalker, not directly under
+         Checker. -->
+    <module name="RegexpSinglelineJava">
+      <property name="id" value="JavaSafeNoVar"/>
+      <property name="format" value="(^|[^.\w])var\s+\w"/>
+      <property name="ignoreComments" value="true"/>
+      <property name="message"
+                value="Convention 4: use the explicit type, not `var`."/>
+    </module>
+
+    <!-- Convention 3: final local variables. validateEnhancedForLoopVariable
+         is true so the for-each loop variable is also required to be final,
+         matching the skill's `for (final X x : ...)` guidance (Checkstyle's
+         default for this property is false). -->
+    <module name="FinalLocalVariable">
+      <property name="id" value="JavaSafeFinalLocal"/>
+      <property name="validateEnhancedForLoopVariable" value="true"/>
+      <message key="final.variable"
+               value="Convention 3: declare this final unless it is genuinely reassigned."/>
+    </module>
+
+    <!-- Convention 3: final method/constructor parameters, plus catch and
+         for-each clause parameters. -->
+    <module name="FinalParameters">
+      <property name="id" value="JavaSafeFinalParam"/>
+      <property name="tokens"
+                value="METHOD_DEF,CTOR_DEF,LITERAL_CATCH,FOR_EACH_CLAUSE"/>
+      <message key="final.parameter"
+               value="Convention 3: declare this parameter final."/>
+    </module>
+  </module>
+</module>
