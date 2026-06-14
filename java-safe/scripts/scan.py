@@ -226,17 +226,21 @@ def main() -> None:
         if out.suffix == ".html":
             out = out.with_suffix(".json")
         out.write_text(json.dumps(scan_data, indent=2), encoding="utf-8")
+        out = out.resolve()
         print(f"Wrote JSON to {out}")
     else:
         from scripts.report import write_report
-        out = write_report(scan_data, Path(args.out))
-        print(f"Wrote HTML report to {out}")
+        out = write_report(scan_data, Path(args.out)).resolve()
+        # Print the report location prominently so it can be handed to the
+        # user as a clickable link (absolute path + file:// URL).
+        print(f"HTML report: {out}")
+        print(f"Open in a browser: {out.as_uri()}")
 
     n = len(violations)
     print(
         f"{n} machine-checkable violation(s) across {len(files)} file(s). "
-        "Nullability (conv 1) and visibility (conv 2) are NOT machine-checked "
-        "— see the report's coverage matrix.",
+        "Nullability (conv 1), visibility (conv 2) and generics-over-Object "
+        "(conv 5) are NOT machine-checked — see the report's coverage matrix.",
         file=sys.stderr,
     )
     if args.fail_on_violations and n:

@@ -1,19 +1,19 @@
 ---
 name: java-safe
-description: Java 编码规范,面向安全、易审查的代码——JSpecify 空值标注(@NullMarked 默认非空 + @Nullable)、最小可见性(默认包级私有)、默认 final、禁用 var。Use whenever writing, generating, refactoring, or reviewing Java (.java) code — new classes, methods, fields, records, enums, tests — or when asked to audit Java for nullability, access-modifier, final, or var-usage violations. Apply these conventions even when the user does not name them explicitly; any time you author or touch Java in this project, this is the house style.
+description: Java 编码规范,面向安全、易审查的代码——JSpecify 空值标注(@NullMarked 默认非空 + @Nullable)、最小可见性(默认包级私有)、默认 final、禁用 var、用泛型代替 Object。Use whenever writing, generating, refactoring, or reviewing Java (.java) code — new classes, methods, fields, records, enums, tests — or when asked to audit Java for nullability, access-modifier, final, var-usage, or raw-Object violations. Apply these conventions even when the user does not name them explicitly; any time you author or touch Java in this project, this is the house style.
 metadata:
-  version: '1.2.0'
+  version: '1.3.0'
 ---
 
 # Java 安全编码规范
 
-写出**默认安全、审查成本低**的 Java。四条规范承担了大部分工作:每个引用的可空性都显式可见、每个声明都尽可能私有、每个绑定除非必须改变否则都是 `final`、每个类型都写全。审查者读一个方法时,无需上下翻找就能知道——什么可能为 null、谁能调用它、什么可以被重新赋值、每个名字的类型是什么。
+写出**默认安全、审查成本低**的 Java。五条规范承担了大部分工作:每个引用的可空性都显式可见、每个声明都尽可能私有、每个绑定除非必须改变否则都是 `final`、每个类型都写全、「任意类型」都用类型参数而非 `Object` 表达。审查者读一个方法时,无需上下翻找就能知道——什么可能为 null、谁能调用它、什么可以被重新赋值、每个名字的类型是什么、一个值的类型能否跨越边界存活。
 
 > 本技能的英文版本保存在 [SKILL.md](SKILL.md)。
 
 这些规则适用于你在此处编写或修改的所有 Java:类、接口、record、enum 和测试。当你改动一个已经遵循它们的文件时,保持其合规;当你改动一个不合规的文件时,见[审查与修复存量代码](#审查与修复存量代码)。
 
-## 四条规范
+## 五条规范
 
 | # | 规范 | 一句话规则 |
 |---|---|---|
@@ -21,6 +21,7 @@ metadata:
 | 2 | **最小可见性** | 从包级私有(无修饰符)起步;仅在真有外部调用方时才放宽到 `protected`/`public`。 |
 | 3 | **默认 `final`** | 局部变量、参数、字段默认 `final`,除非确实需要重新赋值。 |
 | 4 | **禁用 `var`** | 始终写明类型,即便右侧已让类型显而易见。 |
+| 5 | **用泛型代替 `Object`** | 用类型参数 `<T>` 表达「任意类型」,而非 `Object`;仅在契约要求时才用 `Object`。 |
 
 每条都在下文给出**理由**,因为理由才是让你处理表格覆盖不到的边界情况的依据。
 
@@ -233,9 +234,43 @@ names.forEach(name -> log(name));
 
 只在确实需要时才写显式 lambda 形参类型(`(Order order) -> ...`)——例如消除重载歧义或附加注解。禁的是 `var`,不是类型推断。
 
+## 5. 用泛型代替 `Object`
+
+当一个类、方法或字段要处理「调用方自己选的某种类型」时,用**类型参数**表达,而非 `Object`。`Object` 会在边界处把类型丢弃:每个调用方都得在取值时强制转换,而转错就是运行时的 `ClassCastException`,而不是编译错误。类型参数则保住了这层关系——放进去的是什么类型,取出来就是什么类型,由编译器保证。
+
+```java
+// 避免——Object 抹除了类型;调用方必须强转,且可能转错
+final class Box {
+    private final Object value;
+    Box(final Object value) { this.value = value; }
+    Object get() { return value; }
+}
+final String s = (String) box.get();   // 一个随时会爆的 ClassCastException
+
+// 好——类型参数把类型贯穿始终,无需强转
+final class Box<T> {
+    private final T value;
+    Box(final T value) { this.value = value; }
+    T get() { return value; }
+}
+final String s = box.get();            // 由编译器保证
+```
+
+集合与签名同理:优先用 `List<Order>` 或 `List<T>` 而非 `List<Object>`,优先用 `<T> T first(List<T> items)` 而非 `Object first(List<Object> items)`。当方法接受一族无需具名的类型时,用有界类型参数或通配符(`List<? extends Number>`),而不是 `List<Object>`。
+
+### 何时 `Object` *才是*对的
+
+只在契约确实关乎*任意*对象、或语言强制时才用 `Object`:
+
+- **父类型用了 `Object` 的覆盖方法**——`equals(@Nullable Object)`,以及实现的接口里接受 `Object` 的方法。这些不能收窄(见 §1)。
+- **类型参数上界**——`<T extends @Nullable Object>` 是 JSpecify 表达「`T` 可为空」的写法;那里的 `Object` 是*上界*而非值类型,是正确的。
+- **确实与类型无关的用途**——锁(`private final Object lock = new Object();`)、反射(`Class<?>`),或与你无法掌控的前泛型时代 API 互操作。
+
+规则是「不要把 `Object` 当作类型参数的替身」,而非「永远不写 `Object`」。
+
 ## 综合示例
 
-一个触及全部四条规范的小类:
+一个触及前四条规范的小类(第 5 条需要泛型场景,这里从略):
 
 ```java
 @NullMarked
@@ -278,10 +313,11 @@ final class DiscountResolver {                       // 包级私有(2)、final 
 
 1. **缺少可空性约束**——包/类上没有 `@NullMarked`,或方法可能返回 null 却没有 `@Nullable` 返回类型。这些会藏匿 NPE。先在包级加 `@NullMarked`,再标注真正可空的引用;编译器/分析器会把其余的暴露出来。
 2. **可见性过宽**——`public` 的类型和成员,而其包外并无调用方。收窄它们。(当心:一个*确实*被其他模块调用的 `public` 方法是真实契约——别盲目收窄。先确认有无外部调用方;若无法确定,就标记出来而不是贸然破坏。)
-3. **缺少 `final`**——从不重新赋值的局部变量、参数、字段。加上 `final`。
-4. **使用了 `var`**——逐个替换为显式类型。
+3. **`Object` 充当类型参数的替身**——字段/参数/返回值用 `Object`(或 `List<Object>` 之类),而本意是「调用方自己选的类型」。引入类型参数并去掉强转。和可见性一样,这会改签名、可能波及调用方,所以要查调用点——同时放过合法的 `Object` 用法(`equals`、锁、反射、`<T extends @Nullable Object>` 上界)。
+4. **缺少 `final`**——从不重新赋值的局部变量、参数、字段。加上 `final`。
+5. **使用了 `var`**——逐个替换为显式类型。
 
-按此顺序修,并在可空性改动与可见性改动之间重新构建一次,因为收窄可见性可能暴露出你没预料到的调用点。不要把大规模机械式的 `final`/`var` 清扫,和有风险的可见性收窄,捆进同一个无法审查的改动里——把安全的机械编辑与可能破坏调用方的编辑分开。
+按此顺序修,并在可空性改动与会改签名的改动(可见性、泛型)之间重新构建一次,因为后者可能暴露出你没预料到的调用点。不要把大规模机械式的 `final`/`var` 清扫,和有风险的可见性收窄或泛型改造,捆进同一个无法审查的改动里——把安全的机械编辑与可能破坏调用方的编辑分开。
 
 ## 验证可编译
 
@@ -307,5 +343,8 @@ python -m scripts.scan path/to/src --fail-on-violations
 
 - **规范 1(可空性)**——需要 NullAway 接入目标项目自身的构建,无法对散装文件运行。
 - **规范 2(可见性)**——需要跨文件调用方分析,才能区分正当的 `public` API 与过宽的可见性。
+- **规范 5(用泛型代替 `Object`)**——需要语义判断,才能把「`Object` 充当伪泛型」与合法用法(`equals`、锁、反射、上界)区分开。
 
-HTML 报告会在「覆盖矩阵」里把这点写明,因此一次干净的扫描绝不会被误认为完全合规——规范 1 和 2 仍需走[审查与修复存量代码](#审查与修复存量代码)中的人工复核。一个已知边界:字符串字面量里的 `var` 可能误报(罕见)。首次运行时扫描器会把 Checkstyle jar 下载到 `~/.cache/java-safe/`(Checkstyle 13.x 需要 JDK 21+);设置 `CHECKSTYLE_JAR` 可离线复用已有 jar。
+HTML 报告会在「覆盖矩阵」里把这点写明,因此一次干净的扫描绝不会被误认为完全合规——规范 1、2、5 仍需走[审查与修复存量代码](#审查与修复存量代码)中的人工复核。一个已知边界:字符串字面量里的 `var` 可能误报(罕见)。首次运行时扫描器会把 Checkstyle jar 下载到 `~/.cache/java-safe/`(Checkstyle 13.x 需要 JDK 21+);设置 `CHECKSTYLE_JAR` 可离线复用已有 jar。
+
+当你替别人运行扫描器时,**要把报告地址给到对方**:扫描器会同时打印绝对路径和 `file://` URL(`Open in a browser: file://…/report.html`)——把这个链接呈现出来,让对方能直接打开,而不是让报告默默躺在磁盘上。

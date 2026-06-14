@@ -1,19 +1,19 @@
 ---
 name: java-safe
-description: Java coding conventions for safe, reviewable code — JSpecify nullability (@NullMarked default-non-null + @Nullable), minimal visibility (package-private by default), final by default, and no var. Use whenever writing, generating, refactoring, or reviewing Java (.java) code — new classes, methods, fields, records, enums, tests — or when asked to audit Java for nullability, access-modifier, final, or var-usage violations. Apply these conventions even when the user does not name them explicitly; any time you author or touch Java in this project, this is the house style.
+description: Java coding conventions for safe, reviewable code — JSpecify nullability (@NullMarked default-non-null + @Nullable), minimal visibility (package-private by default), final by default, no var, and generics over Object. Use whenever writing, generating, refactoring, or reviewing Java (.java) code — new classes, methods, fields, records, enums, tests — or when asked to audit Java for nullability, access-modifier, final, var-usage, or raw-Object violations. Apply these conventions even when the user does not name them explicitly; any time you author or touch Java in this project, this is the house style.
 metadata:
-  version: '1.2.0'
+  version: '1.3.0'
 ---
 
 # Java Safe Conventions
 
-Write Java that is **safe by default and cheap to review**. Four conventions do most of the work: every reference's nullability is explicit, every declaration is as private as it can be, every binding is `final` unless it must change, and every type is spelled out. A reviewer should be able to read one method and know — without scrolling — what can be null, who can call this, what can be reassigned, and what every name's type is.
+Write Java that is **safe by default and cheap to review**. Five conventions do most of the work: every reference's nullability is explicit, every declaration is as private as it can be, every binding is `final` unless it must change, every type is spelled out, and "any type" is a real type parameter rather than `Object`. A reviewer should be able to read one method and know — without scrolling — what can be null, who can call this, what can be reassigned, what every name's type is, and whether a value's type survives the boundary.
 
 > A Chinese version of this skill is kept at [SKILL.zh.md](SKILL.zh.md).
 
 These rules apply to all Java you author or modify here: classes, interfaces, records, enums, and tests. When you touch a file that already follows them, keep it conforming; when you touch one that doesn't, see [Reviewing and fixing existing code](#reviewing-and-fixing-existing-code).
 
-## The four conventions
+## The five conventions
 
 | # | Convention | One-line rule |
 |---|---|---|
@@ -21,6 +21,7 @@ These rules apply to all Java you author or modify here: classes, interfaces, re
 | 2 | **Minimal visibility** | Start package-private (no modifier); widen to `protected`/`public` only for real external callers. |
 | 3 | **`final` by default** | Locals, parameters, and fields are `final` unless reassignment is genuinely required. |
 | 4 | **No `var`** | Always write the explicit type, even when the right-hand side makes it obvious. |
+| 5 | **Generics over `Object`** | Express "any type" with a type parameter `<T>`, not `Object`; reach for `Object` only where the contract demands it. |
 
 Each is explained below with the reasoning, because the reasoning is what lets you handle the edge cases the table can't.
 
@@ -233,9 +234,43 @@ names.forEach(name -> log(name));
 
 Write an explicit lambda parameter type (`(Order order) -> ...`) only when you genuinely need it — e.g. to disambiguate an overload or to attach an annotation. The ban is on `var`, not on inference.
 
+## 5. Generics over `Object`
+
+When a class, method, or field works with "some type the caller chooses," express that with a **type parameter**, not `Object`. `Object` throws the type away at the boundary: every caller has to cast on the way out, and a wrong cast is a `ClassCastException` at runtime instead of a compile error. A type parameter keeps the relationship — what goes in is what comes out, checked by the compiler.
+
+```java
+// avoid — Object erases the type; callers must cast, and can cast wrong
+final class Box {
+    private final Object value;
+    Box(final Object value) { this.value = value; }
+    Object get() { return value; }
+}
+final String s = (String) box.get();   // a ClassCastException waiting to happen
+
+// good — the type parameter carries the type through, no cast needed
+final class Box<T> {
+    private final T value;
+    Box(final T value) { this.value = value; }
+    T get() { return value; }
+}
+final String s = box.get();            // compiler-guaranteed
+```
+
+The same applies to collections and signatures: prefer `List<Order>` or `List<T>` over `List<Object>`, and `<T> T first(List<T> items)` over `Object first(List<Object> items)`. When a method accepts a family of types it doesn't need to name, use a bounded type parameter or a wildcard (`List<? extends Number>`) rather than `List<Object>`.
+
+### When `Object` *is* correct
+
+Reach for `Object` only where the contract is genuinely about *any* object, or the language forces it:
+
+- **Overrides whose supertype uses `Object`** — `equals(@Nullable Object)`, and methods inherited from an interface that takes `Object`. You can't narrow these (see §1).
+- **Type-parameter bounds** — `<T extends @Nullable Object>` is the JSpecify way to say "`T` may be nullable"; that `Object` is a *bound*, not a value type, and is correct.
+- **Genuinely type-agnostic uses** — a lock (`private final Object lock = new Object();`), reflection (`Class<?>`), or interop with a pre-generics API you don't control.
+
+The rule is "don't use `Object` as a stand-in for a type parameter," not "never write `Object`."
+
 ## Putting it together
 
-A small class touching all four conventions:
+A small class touching the first four conventions (the 5th needs a generic scenario, omitted here):
 
 ```java
 @NullMarked
@@ -278,10 +313,11 @@ When asked to audit or fix Java, scan for these violations in priority order (mo
 
 1. **Missing nullability discipline** — no `@NullMarked` on the package/class, or methods that can return null without a `@Nullable` return type. These hide NPEs. Add `@NullMarked` at the package level first, then annotate the genuinely-nullable references; the compiler/analyzer will surface the rest.
 2. **Over-broad visibility** — `public` types and members with no caller outside their package. Narrow them. (Be careful: a `public` method that *is* called from another module is a real contract — don't narrow blindly. Check for external callers first; if you can't be sure, flag it rather than break it.)
-3. **Missing `final`** — locals, params, and fields that are never reassigned. Add `final`.
-4. **`var` usage** — replace each with the explicit type.
+3. **`Object` standing in for a type parameter** — fields/params/returns typed `Object` (or `List<Object>` and friends) that really mean "a type the caller chooses." Introduce a type parameter and drop the casts. Like visibility, this changes signatures and can ripple to callers, so check call sites — and leave the legitimate `Object` uses alone (`equals`, locks, reflection, `<T extends @Nullable Object>` bounds).
+4. **Missing `final`** — locals, params, and fields that are never reassigned. Add `final`.
+5. **`var` usage** — replace each with the explicit type.
 
-Fix in that order and re-run the build between nullability changes and visibility changes, since narrowing visibility can surface call sites you didn't expect. Don't bundle a giant mechanical `final`/`var` sweep with risky visibility narrowing in one unreviewable change — separate the safe mechanical edits from the ones that can break callers.
+Fix in that order and re-run the build between nullability changes and the signature-changing ones (visibility, generics), since those can surface call sites you didn't expect. Don't bundle a giant mechanical `final`/`var` sweep with risky visibility narrowing or generics changes in one unreviewable change — separate the safe mechanical edits from the ones that can break callers.
 
 ## Verify it compiles
 
@@ -307,5 +343,8 @@ Be honest about its reach — it is a *floor*, like the compile check above. It 
 
 - **Convention 1 (nullability)** — needs NullAway wired into the target project's own build; it can't run on loose files.
 - **Convention 2 (visibility)** — needs cross-file caller analysis to tell a legitimate `public` API from an over-broad one.
+- **Convention 5 (generics over `Object`)** — needs semantic judgment to tell `Object`-as-pseudo-generic from the legitimate uses (`equals`, locks, reflection, bounds).
 
-The HTML report says exactly this in a coverage matrix, so a clean scan is never mistaken for full compliance — conventions 1 and 2 still go through the manual review in [Reviewing and fixing existing code](#reviewing-and-fixing-existing-code). One known edge: a `var` inside a string literal can false-positive (rare). On first run the scanner downloads the Checkstyle jar to `~/.cache/java-safe/` (Checkstyle 13.x needs JDK 21+); set `CHECKSTYLE_JAR` to reuse an existing jar offline.
+The HTML report says exactly this in a coverage matrix, so a clean scan is never mistaken for full compliance — conventions 1, 2 and 5 still go through the manual review in [Reviewing and fixing existing code](#reviewing-and-fixing-existing-code). One known edge: a `var` inside a string literal can false-positive (rare). On first run the scanner downloads the Checkstyle jar to `~/.cache/java-safe/` (Checkstyle 13.x needs JDK 21+); set `CHECKSTYLE_JAR` to reuse an existing jar offline.
+
+When you run the scanner for someone, **give them the report location**: the scanner prints both an absolute path and a `file://` URL (`Open in a browser: file://…/report.html`) — surface that link so they can open it directly, rather than leaving the report unmentioned on disk.

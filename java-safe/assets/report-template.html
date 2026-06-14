@@ -82,6 +82,8 @@ const CONVENTIONS = [
    how:"Checkstyle FinalLocalVariable + FinalParameters."},
   {n:4, name:"No var", checked:true,
    how:"Checkstyle RegexpSinglelineJava."},
+  {n:5, name:"Generics over Object", checked:false,
+   how:"Needs semantic judgment to tell Object-as-pseudo-generic from legitimate Object (equals, locks, reflection, bounds)."},
 ];
 
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
@@ -96,9 +98,9 @@ document.getElementById("sub").textContent =
 document.getElementById("caveat").innerHTML =
   "<strong>Read this first.</strong> This report mechanically verifies only " +
   "conventions 3 (final) and 4 (no var). A clean run means no var/final issues — " +
-  "it does <em>not</em> certify nullability or visibility, which still need the " +
-  "review described in the skill. A <code>var</code> inside a string literal is a " +
-  "known rare false positive.";
+  "it does <em>not</em> certify nullability, visibility, or generics-over-Object, " +
+  "which still need the review described in the skill. A <code>var</code> inside a " +
+  "string literal is a known rare false positive.";
 
 const mtb = document.querySelector("#matrix tbody");
 for (const c of CONVENTIONS) {
