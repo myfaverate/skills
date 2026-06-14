@@ -16,6 +16,20 @@ description: react-layered-feature 架构的完整代码范例,以 src/audio(纯
 
 > logic 层(`audioLogic.ts`)与 Hook 层(`useAudio.ts`)和 React Native 姊妹技能(`rn-layered-feature`)**完全相同**——这正是"状态机保持纯、副作用走注入"的回报。只有适配器与视图是 Web 特有的。
 
+## 目录
+
+可从头读完整构建流程,或跳到某个模块再按文件名搜索。每个文件后紧跟其测试
+(`N` → `Nt` / `Nb`);构建顺序相反——测试先行(见 SKILL.zh.md 的落地清单)。
+
+**[`counter` — 最小分层](#最小范例counter-模块)**(无副作用,`useState` + 纯函数):`counterLogic.ts` + 测试 · `useCounter.ts` + 测试 · `CounterView.tsx` + 测试 · `Counter.tsx` + 测试。
+
+**[`audio` — 标准完整范例](#标准范例audio-模块)**(纯 reducer、注入副作用、计时器、类型化错误):
+- `audioLogic.ts`(逻辑 + reducer)+ 测试
+- `audioRecorder.ts`(接口)· `browserRecorder.ts`(真实适配器)+ 测试
+- `audioPermissions.ts`(接口)· `browserMicrophonePermissions.ts`(浏览器实现)+ 测试
+- `useAudio.ts`(Hook)+ 测试
+- `AudioView.tsx`(视图)· `AudioScreen.tsx`(容器)· `App.tsx`(组合根)
+
 ## 最小范例:counter 模块
 
 无副作用,所以无需依赖注入;状态只是一个数字,所以 `useState` + 纯函数足矣(转移变复杂时再升级到 reducer——见 `audio`)。它仍遵守其余每条规则:带守卫的纯逻辑、用原生 `<button>` 且带 `data-testid` 的纯视图、薄容器,以及每层一个测试。

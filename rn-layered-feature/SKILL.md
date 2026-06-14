@@ -1,8 +1,8 @@
 ---
 name: rn-layered-feature
-description: Layered architecture for React Native feature modules — pure logic+reducer / hook / view three-layer separation, explicit dependency injection for side effects, and a pure state-machine reducer, with mandatory test-first TDD. Use when adding a new feature module, creating screens, hooks, or any component that touches side effects (recording, network, storage, timers, permissions), or when asked to build a testable / layered RN feature. Enforces test-first (red-green-refactor) development.
+description: Layered architecture for React Native feature modules (Expo or bare RN, mobile/native) — pure logic+reducer / hook / view three-layer separation, explicit dependency injection for side effects, and a pure state-machine reducer, with mandatory test-first TDD. Use when adding a new feature module, screen, hook, or any component that touches native side effects (audio/recording, native modules, AsyncStorage, network, timers, permissions), or when asked to build a testable / layered RN or mobile feature — even if the user doesn't say "layered" or "architecture". For web React (Vite/Next/CRA, DOM/browser), use the react-layered-feature skill instead. Enforces test-first (red-green-refactor) development.
 metadata:
-  version: '3.1.0'
+  version: '3.2.0'
 ---
 
 # RN Layered Feature Architecture

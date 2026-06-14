@@ -8,13 +8,14 @@
   :root {
     --green: #1a7f37; --green-bg: #e6f4ea;
     --grey: #57606a; --grey-bg: #f0f1f3;
+    --amber: #9a6700; --amber-bg: #fff8c5;
     --red: #cf222e; --red-bg: #fff0f0;
     --border: #d0d7de; --fg: #1f2328; --muted: #57606a;
   }
   * { box-sizing: border-box; }
   body {
     font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    color: var(--fg); margin: 0; padding: 2rem; max-width: 960px;
+    color: var(--fg); margin: 0; padding: 2rem; max-width: 980px;
     margin-inline: auto; background: #fff;
   }
   h1 { font-size: 1.5rem; margin: 0 0 .25rem; }
@@ -35,6 +36,7 @@
     font-size: .8rem; font-weight: 600; white-space: nowrap;
   }
   .pill.ok { color: var(--green); background: var(--green-bg); }
+  .pill.partial { color: var(--amber); background: var(--amber-bg); }
   .pill.review { color: var(--grey); background: var(--grey-bg); }
   .file { border: 1px solid var(--border); border-radius: 6px; margin-bottom: 1rem; }
   .file > summary {
@@ -45,10 +47,22 @@
   .file .path { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 500; word-break: break-all; }
   .count { color: var(--muted); font-weight: 500; }
   .count.zero { color: var(--green); }
-  .vio { padding: .4rem .9rem; border-bottom: 1px solid #eee; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; }
+  .vio { padding: .55rem .9rem; border-bottom: 1px solid #eee; }
   .vio:last-child { border-bottom: none; }
-  .vio .loc { color: var(--red); font-weight: 600; }
-  .vio .conv { color: var(--muted); }
+  .vmsg { margin-bottom: .35rem; }
+  .vmsg .loc { color: var(--red); font-weight: 600; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .vmsg .conv {
+    color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: .8rem;
+  }
+  .snippet { background: #f6f8fa; border: 1px solid var(--border); border-radius: 4px; overflow-x: auto; }
+  .snippet .row { display: block; white-space: pre; font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .snippet .row.hit { background: var(--red-bg); }
+  .snippet .ln {
+    display: inline-block; width: 3em; padding-right: 1em; text-align: right;
+    color: #8c959f; user-select: none; border-right: 1px solid var(--border); margin-right: 1em;
+  }
+  .snippet .row.hit .ln { color: var(--red); font-weight: 600; }
   .clean { padding: .6rem .9rem; color: var(--green); }
   footer { color: var(--muted); font-size: .8rem; margin-top: 2rem; border-top: 1px solid var(--border); padding-top: 1rem; }
 </style>
@@ -61,7 +75,7 @@
 
 <h2>Coverage matrix</h2>
 <table id="matrix">
-  <thead><tr><th>#</th><th>Convention</th><th>Status</th><th>How</th></tr></thead>
+  <thead><tr><th>#</th><th>Convention</th><th>Status</th><th>What is / isn't checked</th></tr></thead>
   <tbody></tbody>
 </table>
 
@@ -74,17 +88,23 @@
 /*__SCAN_DATA__*/
 
 const CONVENTIONS = [
-  {n:1, name:"Nullability (@NullMarked + @Nullable)", checked:false,
-   how:"Needs NullAway wired into your build — not checkable on loose files."},
-  {n:2, name:"Minimal visibility", checked:false,
-   how:"Needs cross-file caller analysis to tell a real public API from an over-broad one."},
-  {n:3, name:"final by default (locals & params)", checked:true,
+  {n:1, name:"Nullability (@NullMarked default)", status:"partial",
+   how:"Checked: a missing @NullMarked default (file or package-info) is flagged. Not checked: whether a specific return/param should be @Nullable — that needs NullAway."},
+  {n:2, name:"Minimal visibility", status:"partial",
+   how:"Checked: a public top-level type with no cross-package import in the scan set is flagged. Not checked: methods/fields, and reflection/DI/SPI/entry-point uses."},
+  {n:3, name:"final by default (locals & params)", status:"verified",
    how:"Checkstyle FinalLocalVariable + FinalParameters."},
-  {n:4, name:"No var", checked:true,
+  {n:4, name:"No var", status:"verified",
    how:"Checkstyle RegexpSinglelineJava."},
-  {n:5, name:"Generics over Object", checked:false,
-   how:"Needs semantic judgment to tell Object-as-pseudo-generic from legitimate Object (equals, locks, reflection, bounds)."},
+  {n:5, name:"Generics over Object", status:"review",
+   how:"Needs semantic judgment to tell Object-as-pseudo-generic from legitimate Object (equals, locks, reflection, bounds). Not machine-checked."},
 ];
+
+const PILL = {
+  verified: '<span class="pill ok">mechanically verified</span>',
+  partial:  '<span class="pill partial">partial — subset</span>',
+  review:   '<span class="pill review">needs review</span>',
+};
 
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
@@ -93,28 +113,33 @@ const vios = data.violations || [];
 const files = data.files_scanned || [];
 
 document.getElementById("sub").textContent =
-  `${vios.length} machine-checkable violation(s) across ${files.length} file(s).`;
+  `${vios.length} violation(s) across ${files.length} file(s).`;
 
 document.getElementById("caveat").innerHTML =
-  "<strong>Read this first.</strong> This report mechanically verifies only " +
-  "conventions 3 (final) and 4 (no var). A clean run means no var/final issues — " +
-  "it does <em>not</em> certify nullability, visibility, or generics-over-Object, " +
-  "which still need the review described in the skill. A <code>var</code> inside a " +
-  "string literal is a known rare false positive.";
+  "<strong>Read this first.</strong> This report machine-checks conventions 3 (final) " +
+  "and 4 (no var) in full, and conventions 1 (nullability) and 2 (visibility) as reliable " +
+  "<em>subsets</em> — see the matrix for exactly what each covers and misses. Convention 5 " +
+  "is not machine-checked. A clean run is not proof of full house-style compliance. " +
+  "(Known rare false positive: a <code>var</code> inside a string literal.)";
 
 const mtb = document.querySelector("#matrix tbody");
 for (const c of CONVENTIONS) {
   const tr = document.createElement("tr");
-  const pill = c.checked
-    ? '<span class="pill ok">mechanically verified</span>'
-    : '<span class="pill review">needs review</span>';
-  tr.innerHTML = `<td>${c.n}</td><td>${esc(c.name)}</td><td>${pill}</td><td>${esc(c.how)}</td>`;
+  tr.innerHTML = `<td>${c.n}</td><td>${esc(c.name)}</td><td>${PILL[c.status]}</td><td>${esc(c.how)}</td>`;
   mtb.appendChild(tr);
 }
 
 const byFile = {};
 for (const f of files) byFile[f] = [];
 for (const v of vios) { (byFile[v.file] = byFile[v.file] || []).push(v); }
+
+function renderSnippet(v) {
+  if (!v.snippet || !v.snippet.length) return "";
+  const rows = v.snippet.map(s =>
+    `<span class="row${s.hit ? ' hit' : ''}"><span class="ln">${s.n}</span>${esc(s.text) || " "}</span>`
+  ).join("");
+  return `<div class="snippet">${rows}</div>`;
+}
 
 const container = document.getElementById("files");
 for (const f of Object.keys(byFile).sort()) {
@@ -129,7 +154,7 @@ for (const f of Object.keys(byFile).sort()) {
   if (!list.length) {
     const d = document.createElement("div");
     d.className = "clean";
-    d.textContent = "No var/final violations. Nullability & visibility still need manual review.";
+    d.textContent = "No machine-checkable violations. Conventions 1/2 are checked as subsets and 5 not at all — see the matrix.";
     det.appendChild(d);
   } else {
     list.sort((a,b)=>a.line-b.line);
@@ -137,8 +162,10 @@ for (const f of Object.keys(byFile).sort()) {
       const row = document.createElement("div");
       row.className = "vio";
       const conv = v.convention ? `conv ${v.convention}` : "—";
-      row.innerHTML = `<span class="loc">${v.line}:${v.column||0}</span> ` +
-        `<span class="conv">[${conv} · ${esc(v.rule)}]</span> ${esc(v.message)}`;
+      row.innerHTML =
+        `<div class="vmsg"><span class="loc">${v.line}:${v.column||0}</span> ` +
+        `<span class="conv">[${conv} · ${esc(v.rule)}]</span> ${esc(v.message)}</div>` +
+        renderSnippet(v);
       det.appendChild(row);
     }
   }

@@ -2,7 +2,7 @@
 name: java-safe
 description: Java coding conventions for safe, reviewable code — JSpecify nullability (@NullMarked default-non-null + @Nullable), minimal visibility (package-private by default), final by default, no var, and generics over Object. Use whenever writing, generating, refactoring, or reviewing Java (.java) code — new classes, methods, fields, records, enums, tests — or when asked to audit Java for nullability, access-modifier, final, var-usage, or raw-Object violations. Apply these conventions even when the user does not name them explicitly; any time you author or touch Java in this project, this is the house style.
 metadata:
-  version: '1.3.0'
+  version: '1.4.0'
 ---
 
 # Java Safe Conventions
@@ -50,7 +50,8 @@ final class UserLookup {
     }
 
     // returns null when no user matches — so the return type is @Nullable
-    @Nullable User findByEmail(final String email) {
+    @Nullable 
+    User findByEmail(final String email) {
         return repository.queryByEmail(email);
     }
 
@@ -77,19 +78,22 @@ Because `@NullMarked` already makes everything non-null, you almost never write 
 
 ```java
 // A nullable String:
-@Nullable String name;
+@Nullable 
+String name;
 
 // An array that may itself be null, of non-null Strings:
 String @Nullable [] names;
 
 // A non-null array of nullable Strings:
-@Nullable String[] names;
+@Nullable 
+String[] names;
 
 // A non-null list whose elements may be null:
 List<@Nullable String> tokens;
 
 // A nullable list of non-null Strings:
-@Nullable List<String> tokens;
+@Nullable 
+List<String> tokens;
 ```
 
 Put the annotation immediately before the type component it describes. For a plain reference type the leading position reads naturally (`@Nullable User`); for arrays and generics, stop and place it on the exact component you mean.
@@ -331,20 +335,29 @@ A clean compile is the floor, not proof of correctness. The nullability annotati
 
 ## Scanning an existing project
 
-This skill bundles a scanner that flags the **mechanically checkable** conventions across a tree of `.java` files and writes a self-contained HTML report:
+This skill bundles a scanner that flags the machine-checkable conventions across a tree of `.java` files and writes a self-contained HTML report **with the offending source lines shown inline**. Run it inside a throwaway venv so the system Python is never touched:
 
 ```bash
-python -m scripts.scan path/to/src --out report.html
+# one-time: an isolated interpreter under build/ (git-ignored)
+python3 -m venv build/java-safe-venv
+# scan; the report lands in build/reports/ by default
+build/java-safe-venv/bin/python -m scripts.scan path/to/src
 # CI gate: exit non-zero if anything is found
-python -m scripts.scan path/to/src --fail-on-violations
+build/java-safe-venv/bin/python -m scripts.scan path/to/src --fail-on-violations
 ```
 
-Be honest about its reach — it is a *floor*, like the compile check above. It mechanically verifies only **convention 4 (no `var`)** and **convention 3 (`final` locals and parameters)**, via Checkstyle. It does **not** verify:
+What it checks, and **how deeply** — the report's coverage matrix says the same, so a clean scan is never mistaken for full compliance:
 
-- **Convention 1 (nullability)** — needs NullAway wired into the target project's own build; it can't run on loose files.
-- **Convention 2 (visibility)** — needs cross-file caller analysis to tell a legitimate `public` API from an over-broad one.
-- **Convention 5 (generics over `Object`)** — needs semantic judgment to tell `Object`-as-pseudo-generic from the legitimate uses (`equals`, locks, reflection, bounds).
+| # | Convention | Machine check |
+|---|---|---|
+| 3 | `final` locals/params | **Full** — Checkstyle `FinalLocalVariable` + `FinalParameters`. |
+| 4 | No `var` | **Full** — Checkstyle. Known edge: a `var` inside a string literal can false-positive (rare). |
+| 1 | Nullability | **Subset** — a missing `@NullMarked` default (the file or its `package-info.java`) is flagged. Whether a specific return/param should be `@Nullable` still needs NullAway. |
+| 2 | Minimal visibility | **Subset** — a `public` top-level type that nothing imports from another package is flagged as narrowable. Methods/fields and reflection/DI/SPI/entry-point uses are out of scope — verify before narrowing. |
+| 5 | Generics over `Object` | **Not checked** — telling `Object`-as-pseudo-generic from legitimate `Object` (`equals`, locks, reflection, bounds) needs judgment. |
 
-The HTML report says exactly this in a coverage matrix, so a clean scan is never mistaken for full compliance — conventions 1, 2 and 5 still go through the manual review in [Reviewing and fixing existing code](#reviewing-and-fixing-existing-code). One known edge: a `var` inside a string literal can false-positive (rare). On first run the scanner downloads the Checkstyle jar to `~/.cache/java-safe/` (Checkstyle 13.x needs JDK 21+); set `CHECKSTYLE_JAR` to reuse an existing jar offline.
+Conventions whose checks are subsets (1, 2) or absent (5) still go through the manual review in [Reviewing and fixing existing code](#reviewing-and-fixing-existing-code).
 
-When you run the scanner for someone, **give them the report location**: the scanner prints both an absolute path and a `file://` URL (`Open in a browser: file://…/report.html`) — surface that link so they can open it directly, rather than leaving the report unmentioned on disk.
+On first run the scanner downloads the Checkstyle jar to `~/.cache/java-safe/` (Checkstyle 13.x needs JDK 21+ — point `JAVA_HOME` at one); set `CHECKSTYLE_JAR` to reuse an existing jar offline. The report defaults to `build/reports/java-safe-report.html` (override with `--out`; `--format json` gives a machine-readable dump).
+
+When you run the scanner for someone, **give them the report location**: it prints an absolute path and a `file://` URL (`Open in a browser: file://…`) — surface that link so they can open it directly.

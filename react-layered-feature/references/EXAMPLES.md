@@ -16,6 +16,21 @@ Two worked examples, simplest first:
 
 > The logic layer (`audioLogic.ts`) and the hook layer (`useAudio.ts`) are **identical** to the React Native sibling skill (`rn-layered-feature`) — that is the payoff of keeping the state machine pure and the side effects injected. Only the adapters and the views are web-specific.
 
+## Contents
+
+Read top-to-bottom for the full build, or jump to a module and search the file
+name. Each file is shown followed by its test (`N` → `Nt` / `Nb`); the build
+order is the reverse — test first (see the build checklist in SKILL.md).
+
+**[`counter` — minimal layering](#minimal-example-the-counter-module)** (no side effects, `useState` + pure functions): `counterLogic.ts` + test · `useCounter.ts` + test · `CounterView.tsx` + test · `Counter.tsx` + test.
+
+**[`audio` — canonical full example](#canonical-example-the-audio-module)** (pure reducer, injected side effects, timers, typed errors):
+- `audioLogic.ts` (logic + reducer) + test
+- `audioRecorder.ts` (interface) · `browserRecorder.ts` (real adapter) + test
+- `audioPermissions.ts` (interface) · `browserMicrophonePermissions.ts` (browser impl) + test
+- `useAudio.ts` (hook) + test
+- `AudioView.tsx` (view) · `AudioScreen.tsx` (container) · `App.tsx` (composition root)
+
 ## Minimal example: the counter module
 
 No side effects, so no dependency injection; state is a single number, so `useState` + pure functions is enough (promote to a reducer only when transitions get real — see `audio`). It still follows every other rule: pure logic with a guard, a props-only view using native `<button>` elements with `data-testid`, a thin container, and a test at each layer.

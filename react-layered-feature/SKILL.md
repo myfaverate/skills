@@ -1,8 +1,8 @@
 ---
 name: react-layered-feature
-description: Layered architecture for React (web) feature modules — pure logic+reducer / hook / view three-layer separation, explicit dependency injection for side effects, and a pure state-machine reducer, with mandatory test-first TDD. Use when adding a new feature module, creating pages, hooks, or any component that touches side effects (media APIs, network, storage, timers, permissions), or when asked to build a testable / layered React feature. Enforces test-first (red-green-refactor) development.
+description: Layered architecture for web React feature modules (Vite/Next/CRA, DOM and browser APIs) — pure logic+reducer / hook / view three-layer separation, explicit dependency injection for side effects, and a pure state-machine reducer, with mandatory test-first TDD. Use when adding a new feature module, page, hook, or any browser component that touches side effects (media/DOM APIs, fetch, localStorage, timers, permissions), or when asked to build a testable / layered React web feature — even if the user doesn't say "layered" or "architecture". For React Native / Expo / mobile apps, use the rn-layered-feature skill instead. Enforces test-first (red-green-refactor) development.
 metadata:
-  version: '1.0.0'
+  version: '1.1.0'
 ---
 
 # React Layered Feature Architecture

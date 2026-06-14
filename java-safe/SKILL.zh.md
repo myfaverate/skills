@@ -2,7 +2,7 @@
 name: java-safe
 description: Java 编码规范,面向安全、易审查的代码——JSpecify 空值标注(@NullMarked 默认非空 + @Nullable)、最小可见性(默认包级私有)、默认 final、禁用 var、用泛型代替 Object。Use whenever writing, generating, refactoring, or reviewing Java (.java) code — new classes, methods, fields, records, enums, tests — or when asked to audit Java for nullability, access-modifier, final, var-usage, or raw-Object violations. Apply these conventions even when the user does not name them explicitly; any time you author or touch Java in this project, this is the house style.
 metadata:
-  version: '1.3.0'
+  version: '1.4.0'
 ---
 
 # Java 安全编码规范
@@ -50,7 +50,8 @@ final class UserLookup {
     }
 
     // 无匹配用户时返回 null——所以返回类型是 @Nullable
-    @Nullable User findByEmail(final String email) {
+    @Nullable 
+    User findByEmail(final String email) {
         return repository.queryByEmail(email);
     }
 
@@ -77,19 +78,22 @@ final class UserLookup {
 
 ```java
 // 一个可空的 String:
-@Nullable String name;
+@Nullable 
+String name;
 
 // 数组本身可能为 null,元素是非空 String:
 String @Nullable [] names;
 
 // 非空数组,元素是可空 String:
-@Nullable String[] names;
+@Nullable
+String[] names;
 
 // 非空 List,其元素可能为 null:
 List<@Nullable String> tokens;
 
 // 可空 List,其元素是非空 String:
-@Nullable List<String> tokens;
+@Nullable 
+List<String> tokens;
 ```
 
 把注解紧贴在它所描述的类型成分之前。对普通引用类型,放在最前面读起来很自然(`@Nullable User`);对数组和泛型,要停下来,放到你真正指代的那个成分上。
@@ -99,13 +103,15 @@ List<@Nullable String> tokens;
 最常见的 `@NullMarked` 错误就是 `equals`。`Object.equals` 的契约明确接受 null(`x.equals(null)` 必须返回 `false`),但在 `@NullMarked` 作用域内,未标注的参数是非空的——于是那个想当然的覆盖签名是*错的*:
 
 ```java
-@Override public boolean equals(Object obj) { ... }   // 错:此处 obj 被当成非空
+@Override 
+public boolean equals(Object obj) { ... }   // 错:此处 obj 被当成非空
 ```
 
 空值检查器会拒绝它,因为参数的可空性不再与父类匹配。给参数加标注,以匹配继承来的契约:
 
 ```java
-@Override public boolean equals(@Nullable Object obj) {
+@Override 
+public boolean equals(@Nullable Object obj) {
     if (this == obj) {
         return true;
     }
@@ -293,7 +299,8 @@ final class DiscountResolver {                       // 包级私有(2)、final 
     }
 
     // 无规则适用时返回 null——唯一的可空引用(1)
-    @Nullable Discount resolve(final Cart cart) {    // final 参数(3)
+    @Nullable 
+    Discount resolve(final Cart cart) {    // final 参数(3)
         for (final DiscountRule rule : rules) {      // final 循环变量(3)、显式类型(4)
             final Discount discount = rule.apply(cart);  // 显式类型(4)
             if (discount != null) {
@@ -331,20 +338,29 @@ final class DiscountResolver {                       // 包级私有(2)、final 
 
 ## 扫描存量项目
 
-本技能自带一个扫描器,对一整棵 `.java` 文件树扫描**可机器检测**的规范,并生成自包含的 HTML 报告:
+本技能自带一个扫描器,对一整棵 `.java` 文件树扫描可机器检测的规范,并生成自包含的 HTML 报告(**违规所在的源代码行内联展示**)。在一次性的 venv 里运行,绝不碰系统 Python:
 
 ```bash
-python -m scripts.scan path/to/src --out report.html
+# 一次性:在 build/ 下建隔离解释器(已被 git 忽略)
+python3 -m venv build/java-safe-venv
+# 扫描;报告默认落在 build/reports/
+build/java-safe-venv/bin/python -m scripts.scan path/to/src
 # CI 卡点:发现任何违规则以非零退出
-python -m scripts.scan path/to/src --fail-on-violations
+build/java-safe-venv/bin/python -m scripts.scan path/to/src --fail-on-violations
 ```
 
-要诚实看待它的覆盖范围——它和上面的编译检查一样,只是*底线*。它仅以机器方式验证**规范 4(禁用 `var`)**和**规范 3(`final` 局部变量与参数)**,通过 Checkstyle 实现。它**不**验证:
+它检测什么、**检测到多深**——报告的「覆盖矩阵」也会写明,因此一次干净的扫描绝不会被误认为完全合规:
 
-- **规范 1(可空性)**——需要 NullAway 接入目标项目自身的构建,无法对散装文件运行。
-- **规范 2(可见性)**——需要跨文件调用方分析,才能区分正当的 `public` API 与过宽的可见性。
-- **规范 5(用泛型代替 `Object`)**——需要语义判断,才能把「`Object` 充当伪泛型」与合法用法(`equals`、锁、反射、上界)区分开。
+| # | 规范 | 机器检查 |
+|---|---|---|
+| 3 | `final` 局部/参数 | **完整**——Checkstyle `FinalLocalVariable` + `FinalParameters`。 |
+| 4 | 禁用 `var` | **完整**——Checkstyle。已知边界:字符串字面量里的 `var` 可能误报(罕见)。 |
+| 1 | 可空性 | **子集**——缺少 `@NullMarked` 默认(文件本身或其 `package-info.java`)会被标出。某个返回/参数是否该标 `@Nullable` 仍需 NullAway。 |
+| 2 | 最小可见性 | **子集**——在扫描范围内无任何其他包 import 的 `public` 顶层类型会被标为可收窄。方法/字段,以及反射/DI/SPI/入口点用法不在范围内——收窄前请核实。 |
+| 5 | 用泛型代替 `Object` | **不检测**——区分「`Object` 充当伪泛型」与合法 `Object`(`equals`、锁、反射、上界)需要判断。 |
 
-HTML 报告会在「覆盖矩阵」里把这点写明,因此一次干净的扫描绝不会被误认为完全合规——规范 1、2、5 仍需走[审查与修复存量代码](#审查与修复存量代码)中的人工复核。一个已知边界:字符串字面量里的 `var` 可能误报(罕见)。首次运行时扫描器会把 Checkstyle jar 下载到 `~/.cache/java-safe/`(Checkstyle 13.x 需要 JDK 21+);设置 `CHECKSTYLE_JAR` 可离线复用已有 jar。
+检查为子集(1、2)或缺失(5)的规范,仍需走[审查与修复存量代码](#审查与修复存量代码)中的人工复核。
 
-当你替别人运行扫描器时,**要把报告地址给到对方**:扫描器会同时打印绝对路径和 `file://` URL(`Open in a browser: file://…/report.html`)——把这个链接呈现出来,让对方能直接打开,而不是让报告默默躺在磁盘上。
+首次运行时扫描器会把 Checkstyle jar 下载到 `~/.cache/java-safe/`(Checkstyle 13.x 需要 JDK 21+——把 `JAVA_HOME` 指向它);设置 `CHECKSTYLE_JAR` 可离线复用已有 jar。报告默认输出到 `build/reports/java-safe-report.html`(用 `--out` 覆盖;`--format json` 输出机器可读的 dump)。
+
+当你替别人运行扫描器时,**要把报告地址给到对方**:它会打印绝对路径和 `file://` URL(`Open in a browser: file://…`)——把这个链接呈现出来,让对方能直接打开。

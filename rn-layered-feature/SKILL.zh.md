@@ -1,8 +1,8 @@
 ---
 name: rn-layered-feature
-description: React Native 功能模块的分层架构——纯逻辑+reducer / Hook / 视图三层分离,副作用显式依赖注入,业务状态机为纯 reducer,且必须 TDD 测试先行。Use when adding a new feature module, creating screens, hooks, or any component that touches side effects (recording, network, storage, timers, permissions), or when asked to build a testable / layered RN feature. Enforces test-first (red-green-refactor) development.
+description: React Native 功能模块的分层架构(Expo 或裸 RN,移动端/原生)——纯逻辑+reducer / Hook / 视图三层分离,副作用显式依赖注入,业务状态机为纯 reducer,且必须 TDD 测试先行。Use when adding a new feature module, screen, hook, or any component that touches native side effects (audio/recording, native modules, AsyncStorage, network, timers, permissions), or when asked to build a testable / layered RN or mobile feature — even if the user doesn't say "layered" or "architecture". For web React (Vite/Next/CRA, DOM/browser), use the react-layered-feature skill instead. Enforces test-first (red-green-refactor) development.
 metadata:
-  version: '3.1.0'
+  version: '3.2.0'
 ---
 
 # RN 功能模块分层架构
